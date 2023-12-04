@@ -1,83 +1,76 @@
 from flask import request,jsonify
-
-#pip install pandas
 import pandas as pd
-#pip install scikit-learn
-#Instalando las Librerias Para Hacer nuestra Red Neuronal
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
-from utilitarios import generando_predicciones
-
-#Creando la Aplicacion Back-End
+from utilitarios import generando_predicciones,conexion_postgress
 from app import app
 
-#Creando el Api Para Consumir por el Front
-@app.route('/api/prediccion_ampaid',methods=['POST', 'GET'])
+@app.route('/api/prediccion_ampaid',methods=['POST'])
 def predeccir():
     try:
+        nombre_tabla = 'ampaid.t_hist_evento_delictivo'
+        consulta_sql = f"SELECT * FROM {nombre_tabla};"
         if request.method == 'POST':
             if request.is_json:
                 datapost=request.get_json()
-                # # Cargar los datos históricos de delitos
-                data = pd.read_csv('datos_delincuencia3.csv',sep=";")
-                # print(data.info()) #Si deseas ver el Tipo de Dato de los Campos
-                # En este ejemplo,  ya se han limpiado y preparado los datos.
-                # Dividir los datos en características (X) y etiquetas (y)
-                X = data[['hora_robo', 'DiaDeLaSemana']]
-                y = data['tipo_de_delito']
+                # todo  1.- RECOPILAR LOS DATOS
+                data = pd.read_sql_query(consulta_sql,conexion_postgress())
 
-                #Dividir los datos en conjuntos de entrenamiento y prueba
+                #todo En este ejemplo,  ya se han limpiado y preparado los datos.
+                #todo 2.- procesamiento de datos
+                # Dividir los datos en características (X) y etiquetas (y)
+                X = data[['id_evento', 'id_tipo_via']]
+                y = data['delito']
+
+                #todo 3 Dividir los datos en conjuntos de entrenamiento y prueba
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-                #Crear un modelo de Random Forest Classifier
+                #todo 4 este es la red neuronal
+
                 modelo = RandomForestClassifier(n_estimators=100, random_state=42)
 
-                #Entrenar el modelo
+                #todo 4 es entrenar el modelo
                 modelo.fit(X_train, y_train)
 
-                #Realizar predicciones en el conjunto de prueba
+                #todo prediccion el modelo
                 y_pred = modelo.predict(X_test)
 
-                #Evaluar el rendimiento del modelo
+                #todo 4 evaluas el rendimeinto del modelo
                 accuracy = accuracy_score(y_test, y_pred)
                 print(f"Precisión del modelo: {accuracy * 100:.2f}%")
 
-                # Ahora puedes usar el modelo para predecir si ocurrirá un robo
-                # hora = 14  # Hora del día (ejemplo)
-                # dia_semana = 2  # Martes (ejemplo)
-
-                # Ahora puedes usar el modelo para predecir si ocurrirá un robo debes pasarle la informacion desde el postman en formato JSON 
-                """
-                    {  "hora":14,
-                        "diadelasemana":2
-                    }
-                """
-
-                hora = datapost['hora']  # 14 Hora del día (ejemplo)
-                dia_semana = datapost['diadelasemana'] #2  # Martes (ejemplo)
+                #todo parametros que se le pasa al modo
+                dia_semana = datapost['diadelasemana']
                 latitud=str(datapost['latitud'])
                 longitud=str(datapost['longitud'])
-                slatitud=latitud[:6]
-                slongitud=longitud[:6]
 
+                slatitud = latitud[:6]
+                slongitud = longitud[:6]
 
-                nueva_entrada = [[hora, dia_semana]]
+                nueva_entrada = [[0, dia_semana]]
                 prediccion = modelo.predict(nueva_entrada)
+                #todo si devuelve uno se produzco el delito
                 if prediccion[0] == 1:
-                    return jsonify({'datos': generando_predicciones(slatitud,slongitud)})
+                    datos_json= generando_predicciones(slatitud,slongitud,dia_semana)
+
+                    #todo mostrar las columnas en el JSON
+
+                    columnas_deseadas = ["latitud", "longitud", "fecha_evento", "id_evento","desc_tipo_evento",
+                                         "id_tipo_via", "tipo_via", "nombre_via","nro_cuadra","Numero_Del_Dia"]
+
+                    # todo el nuevo modelo prediciendo los datos
+                    pd_prediccion_nuevo = datos_json[columnas_deseadas]
+
+                    #todo modificando el formato de fecha mm/dd/yyyy
+
+                    pd_prediccion_nuevo['fecha_evento'] = pd.to_datetime(datos_json['fecha_evento'])
+                    pd_prediccion_nuevo['fecha_evento'] = pd_prediccion_nuevo['fecha_evento'].dt.strftime('%d-%m-%Y')
+
+                    #todo convirtiendo los datos del modelo a JSON
+                    pd_json = pd_prediccion_nuevo.to_dict(orient='records')
+                    return jsonify({"datos":pd_json})
                 else:
                     return {"datos": "nada que mostrar"}
-    except :
-        return {"datos": "parametos ingresados incorrectos"}
-
-
-                    
-##Test de Pruebas
-    #http://127.0.0.1:5000/api/prediccion_ampaid
-    #json
-    """
-    {  "hora":14,
-     "diadelasemana":2
-    }
-    """
+    except  Exception as  error:
+        return {"datos": error}
