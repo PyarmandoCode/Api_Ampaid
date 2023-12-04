@@ -6,6 +6,8 @@ from sklearn.metrics import accuracy_score
 from utilitarios import generando_predicciones,conexion_postgress
 from app import app
 
+
+
 @app.route('/api/prediccion_ampaid',methods=['POST'])
 def predeccir():
     try:
@@ -74,3 +76,5 @@ def predeccir():
                     return {"datos": "nada que mostrar"}
     except  Exception as  error:
         return {"datos": error}
+
+
