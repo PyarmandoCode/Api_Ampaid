@@ -59,7 +59,7 @@ def predeccir():
                     #todo mostrar las columnas en el JSON
 
                     columnas_deseadas = ["latitud", "longitud", "fecha_evento", "id_evento","desc_tipo_evento",
-                                         "id_tipo_via", "tipo_via", "nombre_via","nro_cuadra","Numero_Del_Dia"]
+                                         "id_tipo_via", "tipo_via", "nombre_via","nro_cuadra","criticidad","Numero_Del_Dia"]
 
                     # todo el nuevo modelo prediciendo los datos
                     pd_prediccion_nuevo = datos_json[columnas_deseadas]
